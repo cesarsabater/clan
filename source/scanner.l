@@ -47,7 +47,6 @@ IS ((u|U)|(u|U)?(l|L|ll|LL)|(l|L|ll|LL)(u|U))
 %{
    #include <stdlib.h>
    #include <string.h>
-   
    #include <osl/vector.h>
    #include <osl/relation.h>
    #include <osl/relation_list.h>
@@ -140,13 +139,14 @@ IS ((u|U)|(u|U)?(l|L|ll|LL)|(l|L|ll|LL)(u|U))
                               scanner_column += 2;
                               BEGIN LINECOMMENT;    /* Enter LINECOMMENT mode*/
                             }
+             
 "/* Clay\n"                 {
                               scanner_column = 1;
                               scanner_line++;
 			      if (scanner_comment == 0)
 				BEGIN CLAY;         /* Enter CLAY mode*/
 			      else
-                                BEGIN FULLCOMMENT;  /* Enter FULLCOMMENT mode*/
+                              BEGIN FULLCOMMENT;  /* Enter FULLCOMMENT mode*/
                               scanner_comment++;
                             }
 "/*"                        {
@@ -197,6 +197,12 @@ IS ((u|U)|(u|U)?(l|L|ll|LL)|(l|L|ll|LL)(u|U))
 "ceild"                     { return clan_scanner(CEILD, "ceild"); }
 "floord"                    { return clan_scanner(FLOORD, "floord"); }
 
+"#pragma"[ ]+"doi"					{ 
+															clan_scanner_count();
+															//scanner_column += strlen("#pragma doi"); 
+															return clan_scanner(PRAGMA_DOI, "#pragma doi"); 
+														} 
+
 "#pragma"[ ]+"scop"         { 
                               clan_scanner_count();
                               scanner_scop_start = scanner_line;
@@ -235,6 +241,7 @@ IS ((u|U)|(u|U)?(l|L|ll|LL)|(l|L|ll|LL)(u|U))
                               yylval.value = atoi(yytext) ;
                               return clan_scanner(INTEGER, "INTEGER");
                             }
+
 0[xX]{H}+{IS}?              { return clan_scanner(CONSTANT, "CONSTANT_0"); }
 0{D}+{IS}?                  { return clan_scanner(CONSTANT, "CONSTANT_1"); }
 {D}+{IS}?                   { return clan_scanner(CONSTANT, "CONSTANT_2"); }
@@ -245,8 +252,12 @@ L?'(\\.|[^\\'\n])+'         { return clan_scanner(CONSTANT, "CONSTANT_3"); }
 0[xX]{H}+{P}{FS}?           { return clan_scanner(CONSTANT, "CONSTANT_7"); }
 0[xX]{H}*"."{H}+({P})?{FS}? { return clan_scanner(CONSTANT, "CONSTANT_8"); }
 0[xX]{H}+"."{H}*({P})?{FS}? { return clan_scanner(CONSTANT, "CONSTANT_9"); }
-L?\"(\\.|[^\\"\n])*\"       { return clan_scanner(STRING_LITERAL, "STRING"); }
-
+L?\"(\\.|[^\\"\n])*\"       { 
+															if (scanner_parsing == CLAN_TRUE) { 
+																							CLAN_strdup(yylval.symbol, yytext);
+																						}
+															return clan_scanner(STRING_LITERAL, "STRING"); 
+														}
 "..."                       { return clan_scanner(ELLIPSIS, "..."); }
 ">>="                       { return clan_scanner(RIGHT_ASSIGN, ">>="); }
 "<<="                       { return clan_scanner(LEFT_ASSIGN, "<<="); }
@@ -293,6 +304,7 @@ L?\"(\\.|[^\\"\n])*\"       { return clan_scanner(STRING_LITERAL, "STRING"); }
 "^"                         { return clan_scanner('^', "^"); }
 "|"                         { return clan_scanner('|', "|"); }
 "?"                         { return clan_scanner('?', "?"); }
+
 [ \t\v\n\f]                 { clan_scanner_count();
                               // A list of separators is translated to a
                               // single space. We proceed one by one to

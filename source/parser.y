@@ -58,8 +58,10 @@
    #include <osl/generic.h>
    #include <osl/body.h>
    #include <osl/extensions/arrays.h>
-   #include <osl/extensions/extbody.h>
+   #include <osl/extensions/doi.h>
+   #include <osl/extensions/extbody.h>	
    #include <osl/scop.h>
+   #include <osl/util.h>
    #include <clan/macros.h>
    #include <clan/vector.h>
    #include <clan/relation.h>
@@ -141,10 +143,11 @@
          osl_relation_p setex;           /**< A set of affine expressions */
          osl_relation_list_p list;       /**< List of array accesses */
          osl_statement_p stmt;           /**< List of statements */
+         osl_doi_p doi;						 /**< List of domains of interest */
        }
 
 
-%token CONSTANT STRING_LITERAL SIZEOF
+%token CONSTANT SIZEOF
 %token PTR_OP INC_OP DEC_OP LEFT_OP RIGHT_OP LE_OP GE_OP EQ_OP NE_OP
 %token AND_OP OR_OP MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN ADD_ASSIGN
 %token SUB_ASSIGN LEFT_ASSIGN RIGHT_ASSIGN AND_ASSIGN
@@ -157,10 +160,13 @@
 
 %token CASE DEFAULT IF ELSE SWITCH WHILE DO FOR GOTO CONTINUE BREAK RETURN
 
+%token PRAGMA_DOI
 %token IGNORE PRAGMA
 %token MIN MAX CEILD FLOORD
 %token <symbol> ID
 %token <value>  INTEGER
+%token <symbol> STRING_LITERAL
+
 
 %type <stmt>   statement_list
 %type <stmt>   statement_indented
@@ -209,6 +215,8 @@
 %type <list>   assignment_expression
 %type <list>   expression
 %type <value>  assignment_operator
+%type <doi>		 doi
+%type <doi> 	 doi_list
 
 %destructor { free($$); } <symbol>
 %destructor { osl_vector_free($$); } <affex>
@@ -234,11 +242,11 @@ scop_list:
 
 // Rules for a scop
 scop:
-    statement_list IGNORE
+	doi_list statement_list IGNORE
     {
       int nb_parameters;
       osl_scop_p scop;
-      osl_generic_p arrays;
+      osl_generic_p arrays, dois; 
 
       CLAN_debug("rule scop.1: statement_list IGNORE");
       scop = osl_scop_malloc();
@@ -253,7 +261,7 @@ scop:
                                                   parser_options);
       
       // Set the statements.
-      scop->statement = $1;
+      scop->statement = $2;
 
       // Compact the SCoP relations.
       if (CLAN_DEBUG) {
@@ -277,6 +285,11 @@ scop:
       osl_generic_add(&scop->extension, arrays);
       clan_scop_generate_coordinates(scop, parser_options->name);
       clan_scop_generate_clay(scop, scanner_clay);
+      // Doi list extension  
+			if ($1 != NULL) { 
+				dois = osl_generic_shell($1, osl_doi_interface());
+				osl_generic_add(&scop->extension, dois);
+			}
 
       // Add the SCoP to parser_scop and prepare the state for the next SCoP.
       osl_scop_add(&parser_scop, scop);
@@ -285,7 +298,37 @@ scop:
       CLAN_debug_call(osl_scop_dump(stderr, scop));
     } 
   ;
+  
 
+// Rules for a domain of interest list
+doi_list:  /* empty rule */ 
+						{ 
+							CLAN_debug("rule doi_list.1: (void)");  
+							$$ = NULL; 
+						} 
+					| doi_list doi  
+						{ 
+							CLAN_debug("rule doi_list.2: doi_list doi"); 
+							$$ = osl_doi_concat($1, $2); 
+						}
+					;
+
+// Rules for a domain of interest
+doi: 
+	PRAGMA_DOI INTEGER STRING_LITERAL STRING_LITERAL 
+		{ 
+			osl_doi_p doi = osl_doi_malloc();
+			if (CLAN_DEBUG) { 
+				fprintf(stderr, 
+					"\tPRIORITY: %d\n\tDOMAIN: %s\n\tCOMPUTATION: %s\n", 
+					$2, $3, $4);
+			}
+			doi->priority = $2; 
+			doi->dom = osl_util_strcleanq($3);
+			doi->comp = osl_util_strcleanq($4);
+			$$ = doi; 
+		} 
+	;
 
 // Rules for a statement list
 // Return <stmt>
@@ -308,7 +351,6 @@ statement_indented:
       $$ = $2;
     }
   ; 
-
 
 // Rules for a statement
 // Return <stmt>
@@ -349,7 +391,7 @@ compound_statement:
     '{' '}'                  { $$ = NULL; }
   | '{' statement_list '}'   { $$ = $2; }
   ;
-
+  
 
 // +--------------------------------------------------------------------------+
 // |                           AFFINE CONTROL PART                            |
