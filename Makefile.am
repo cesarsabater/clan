@@ -74,7 +74,7 @@ BUILT_SOURCES = parser.h
 DEFAULT_INCLUDES = -I.
 INCLUDES = -I$(top_builddir)/include -I$(top_srcdir)/include
 AM_CFLAGS = $(CFLAGS_WARN)
-YFLAGS = -y -d
+YFLAGS = --report=state -y -d
 
 #############################################################################
 

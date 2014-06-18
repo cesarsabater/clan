@@ -303,7 +303,7 @@ scop:
 // Rules for a domain of interest list
 doi_list:  /* empty rule */ 
 						{ 
-							CLAN_debug("rule doi_list.1: (void)");  
+							CLAN_debug("rule doi_list.1: <void>");  
 							$$ = NULL; 
 						} 
 					| doi_list doi  
@@ -314,20 +314,19 @@ doi_list:  /* empty rule */
 					;
 
 // Rules for a domain of interest
-doi: 
-	PRAGMA_DOI INTEGER STRING_LITERAL STRING_LITERAL 
-		{ 
-			osl_doi_p doi = osl_doi_malloc();
-			if (CLAN_DEBUG) { 
-				fprintf(stderr, 
-					"\tPRIORITY: %d\n\tDOMAIN: %s\n\tCOMPUTATION: %s\n", 
-					$2, $3, $4);
-			}
-			doi->priority = $2; 
-			doi->dom = osl_util_strcleanq($3);
-			doi->comp = osl_util_strcleanq($4);
-			$$ = doi; 
-		} 
+doi:
+		PRAGMA_DOI INTEGER STRING_LITERAL STRING_LITERAL
+			{ 
+				osl_doi_p doi = osl_doi_malloc();
+				char null[20]; 
+				// wrapping null statement to compare
+				strcpy(null, "\""); strcat(strcat(null, OSL_DOI_NULL), "\"");
+				doi->priority = $2; 
+				doi->dom = osl_util_strcleanq($3);
+				if (strcmp($4, null) != 0) 
+					doi->comp = osl_util_strcleanq($4);
+				$$ = doi; 
+			} 
 	;
 
 // Rules for a statement list
