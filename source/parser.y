@@ -47,6 +47,7 @@
    #include <stdio.h>
    #include <stdlib.h>
    #include <string.h>
+   #include <ctype.h>
    #include <assert.h>
    
    #include <osl/macros.h>
@@ -58,7 +59,7 @@
    #include <osl/generic.h>
    #include <osl/body.h>
    #include <osl/extensions/arrays.h>
-   #include <osl/extensions/doi.h>
+   #include <osl/extensions/doi.h> 
    #include <osl/extensions/extbody.h>	
    #include <osl/scop.h>
    #include <osl/util.h>
@@ -84,6 +85,7 @@
    void clan_parser_increment_loop_depth();
    void clan_parser_state_initialize(clan_options_p);
    osl_scop_p clan_parse(FILE*, clan_options_p);
+   osl_strings_p clan_parser_isl_get_params(char *);
 
    extern FILE*   yyin;                 /**< File to be read by Lex */
    extern int     scanner_parsing;      /**< Do we parse or not? */
@@ -242,7 +244,7 @@ scop_list:
 
 // Rules for a scop
 scop:
-	doi_list statement_list IGNORE
+		doi_list statement_list IGNORE
     {
       int nb_parameters;
       osl_scop_p scop;
@@ -286,7 +288,7 @@ scop:
       clan_scop_generate_coordinates(scop, parser_options->name);
       clan_scop_generate_clay(scop, scanner_clay);
       // Doi list extension  
-			if ($1 != NULL) { 
+		  if ($1 != NULL) { 
 				dois = osl_generic_shell($1, osl_doi_interface());
 				osl_generic_add(&scop->extension, dois);
 			}
@@ -301,6 +303,7 @@ scop:
   
 
 // Rules for a domain of interest list
+// Return <doi_list>
 doi_list:  /* empty rule */ 
 						{ 
 							CLAN_debug("rule doi_list.1: <void>");  
@@ -314,18 +317,33 @@ doi_list:  /* empty rule */
 					;
 
 // Rules for a domain of interest
+// Return <doi>
 doi:
 		PRAGMA_DOI INTEGER STRING_LITERAL STRING_LITERAL
 			{ 
+				int j;
 				osl_doi_p doi = osl_doi_malloc();
 				char null[20]; 
+				osl_strings_p params; 
+				
 				// wrapping null statement to compare
 				strcpy(null, "\""); strcat(strcat(null, OSL_DOI_NULL), "\"");
 				doi->priority = $2; 
-				doi->dom = osl_util_strcleanq($3);
+				doi->dom = osl_util_strcleanq($3);				
+							
+				params = clan_parser_isl_get_params(doi->dom);
+				for (j = 0; j < osl_strings_size(params); j++) {
+					clan_symbol_p id = clan_symbol_lookup(parser_symbol, params->string[j]);
+					if (id == NULL) { 
+						id = clan_symbol_add(&parser_symbol, params->string[j], CLAN_UNDEFINED); 
+						id->rank = ++parser_nb_parameters;
+						id->type = CLAN_TYPE_PARAMETER;	
+					}
+				}
+				
 				if (strcmp($4, null) != 0) 
 					doi->comp = osl_util_strcleanq($4);
-				$$ = doi; 
+				$$ = doi;
 			} 
 	;
 
@@ -1867,7 +1885,6 @@ int clan_parser_nb_ld() {
   return nb_ld;
 }
 
-
 void clan_parser_increment_loop_depth() {
   parser_loop_depth++;
   if ((parser_loop_depth + parser_if_depth) > CLAN_MAX_DEPTH)
@@ -1944,6 +1961,7 @@ void clan_parser_state_initialize(clan_options_p options) {
 
   for (i = 0; i < 2 * CLAN_MAX_DEPTH + 1; i++)
     parser_scattering[i] = 0;
+  	
 }
 
 
@@ -1966,6 +1984,49 @@ void clan_parser_reinitialize() {
   clan_parser_state_initialize(parser_options);
 }
 
+osl_strings_p clan_parser_isl_get_params(char *dom) {
+	int noid = 0; 
+	char *tmp, aux; 
+	osl_strings_p params; 
+	
+	
+	osl_util_sskip_blank_and_comments(&dom); 
+	if (*dom == '{') 
+		return NULL; 
+	if (*dom != '[') 
+		CLAN_error("error while parsing isl params"); 
+	
+	params = osl_strings_malloc();
+	
+	do { 
+		dom++;
+		osl_util_sskip_blank_and_comments(&dom); 
+		if (!isalpha(*dom) && noid == 1) // not id and 
+			CLAN_error("error while parsing isl params"); 
+		else if (!isalpha(*dom) && *dom != ']') // not id and no closing bracket
+			CLAN_error("error while parsing isl params"); 
+		else if (*dom == ']') 		// closing bracket, finish reading parameters
+			break;
+		noid = 1;
+		tmp = dom+1;
+		while ((isalpha(*tmp) || isdigit(*tmp)) ) 
+			tmp++;	
+		aux = *tmp;
+		*tmp = '\0';
+		osl_strings_add(params, dom);
+		*tmp = aux; 
+		dom = tmp;
+	 
+		osl_util_sskip_blank_and_comments(&dom);
+
+	} while ( *dom == ',') ;
+			
+	if (*dom != ']')
+		CLAN_error("error while parsing isl params");
+		
+	return params;
+}
+
 
 /**
  * clan_parser_autoscop function:
@@ -1984,7 +2045,7 @@ void clan_parser_autoscop() {
   char c;
   int coordinates[5][CLAN_MAX_SCOPS]; // 0, 1: line start, end
                                       // 2, 3: column start, end
-				      // 4: autoscop or not
+																			// 4: autoscop or not
  
   while (1) {
     // For the automatic extraction, we parse everything except user-SCoPs.
