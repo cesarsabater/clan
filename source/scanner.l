@@ -197,10 +197,10 @@ IS ((u|U)|(u|U)?(l|L|ll|LL)|(l|L|ll|LL)(u|U))
 "ceild"                     { return clan_scanner(CEILD, "ceild"); }
 "floord"                    { return clan_scanner(FLOORD, "floord"); }
 
-"#pragma"[ ]+"doi"					{ 
+"#pragma"[ ]+"spot"					{ 
 															clan_scanner_count();
-															//scanner_column += strlen("#pragma doi"); 
-															return clan_scanner(PRAGMA_DOI, "#pragma doi"); 
+															//scanner_column += strlen("#pragma spot"); 
+															return clan_scanner(PRAGMA_SPOT, "#pragma spot"); 
 														} 
 
 "#pragma"[ ]+"scop"         { 

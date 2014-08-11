@@ -59,7 +59,7 @@
    #include <osl/generic.h>
    #include <osl/body.h>
    #include <osl/extensions/arrays.h>
-   #include <osl/extensions/doi.h> 
+   #include <osl/extensions/spot.h> 
    #include <osl/extensions/extbody.h>	
    #include <osl/scop.h>
    #include <osl/util.h>
@@ -145,7 +145,7 @@
          osl_relation_p setex;           /**< A set of affine expressions */
          osl_relation_list_p list;       /**< List of array accesses */
          osl_statement_p stmt;           /**< List of statements */
-         osl_doi_p doi;						 /**< List of domains of interest */
+         osl_spot_p spot;						 /**< List of domains of interest */
        }
 
 
@@ -162,7 +162,7 @@
 
 %token CASE DEFAULT IF ELSE SWITCH WHILE DO FOR GOTO CONTINUE BREAK RETURN
 
-%token PRAGMA_DOI
+%token PRAGMA_SPOT
 %token IGNORE PRAGMA
 %token MIN MAX CEILD FLOORD
 %token <symbol> ID
@@ -217,8 +217,8 @@
 %type <list>   assignment_expression
 %type <list>   expression
 %type <value>  assignment_operator
-%type <doi>		 doi
-%type <doi> 	 doi_list
+%type <spot>		 spot
+%type <spot> 	 spot_list
 
 %destructor { free($$); } <symbol>
 %destructor { osl_vector_free($$); } <affex>
@@ -244,11 +244,11 @@ scop_list:
 
 // Rules for a scop
 scop:
-		doi_list statement_list IGNORE
+		spot_list statement_list IGNORE
     {
       int nb_parameters;
       osl_scop_p scop;
-      osl_generic_p arrays, dois; 
+      osl_generic_p arrays, spots; 
 
       CLAN_debug("rule scop.1: statement_list IGNORE");
       scop = osl_scop_malloc();
@@ -287,10 +287,10 @@ scop:
       osl_generic_add(&scop->extension, arrays);
       clan_scop_generate_coordinates(scop, parser_options->name);
       clan_scop_generate_clay(scop, scanner_clay);
-      // Doi list extension  
+      // Spot list extension  
 		  if ($1 != NULL) { 
-				dois = osl_generic_shell($1, osl_doi_interface());
-				osl_generic_add(&scop->extension, dois);
+				spots = osl_generic_shell($1, osl_spot_interface());
+				osl_generic_add(&scop->extension, spots);
 			}
 
       // Add the SCoP to parser_scop and prepare the state for the next SCoP.
@@ -303,35 +303,35 @@ scop:
   
 
 // Rules for a domain of interest list
-// Return <doi_list>
-doi_list:  /* empty rule */ 
+// Return <spot_list>
+spot_list:  /* empty rule */ 
 						{ 
-							CLAN_debug("rule doi_list.1: <void>");  
+							CLAN_debug("rule spot_list.1: <void>");  
 							$$ = NULL; 
 						} 
-					| doi_list doi  
+					| spot_list spot  
 						{ 
-							CLAN_debug("rule doi_list.2: doi_list doi"); 
-							$$ = osl_doi_concat($1, $2); 
+							CLAN_debug("rule spot_list.2: spot_list spot"); 
+							$$ = osl_spot_concat($1, $2); 
 						}
 					;
 
 // Rules for a domain of interest
-// Return <doi>
-doi:
-		PRAGMA_DOI INTEGER STRING_LITERAL STRING_LITERAL
+// Return <spot>
+spot:
+		PRAGMA_SPOT INTEGER STRING_LITERAL STRING_LITERAL
 			{ 
 				int j;
-				osl_doi_p doi = osl_doi_malloc();
+				osl_spot_p spot = osl_spot_malloc();
 				char null[20]; 
 				osl_strings_p params; 
 				
 				// wrapping null statement to compare
-				strcpy(null, "\""); strcat(strcat(null, OSL_DOI_NULL), "\"");
-				doi->priority = $2; 
-				doi->dom = osl_util_strcleanq($3);				
+				strcpy(null, "\""); strcat(strcat(null, OSL_SPOT_NULL), "\"");
+				spot->priority = $2; 
+				spot->dom = osl_util_strcleanq($3);				
 							
-				params = clan_parser_isl_get_params(doi->dom);
+				params = clan_parser_isl_get_params(spot->dom);
 				for (j = 0; j < osl_strings_size(params); j++) {
 					clan_symbol_p id = clan_symbol_lookup(parser_symbol, params->string[j]);
 					if (id == NULL) { 
@@ -342,8 +342,8 @@ doi:
 				}
 				
 				if (strcmp($4, null) != 0) 
-					doi->comp = osl_util_strcleanq($4);
-				$$ = doi;
+					spot->comp = osl_util_strcleanq($4);
+				$$ = spot;
 			} 
 	;
 
